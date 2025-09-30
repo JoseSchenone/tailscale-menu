@@ -34,7 +34,6 @@ Permite conectarse/desconectarse fácilmente, elegir exit-nodes disponibles y co
     ```
 
 ## 🖼️ Ejemplo de uso
-    ```
     ============================
        Control de Tailscale
     ============================
@@ -46,7 +45,6 @@ Permite conectarse/desconectarse fácilmente, elegir exit-nodes disponibles y co
     0) Salir
     ============================
     Elige una opción: 
-    ```
 
 Si eliges la opción 2, mostrará una lista de exit-nodes disponibles en tu red.
 
