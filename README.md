@@ -33,7 +33,7 @@ Permite conectarse/desconectarse fácilmente, elegir exit-nodes disponibles y co
     ./tailscale-menu.sh
     ```
 
-🖼️ Ejemplo de uso
+## 🖼️ Ejemplo de uso
     ```
     ============================
        Control de Tailscale
@@ -50,6 +50,6 @@ Permite conectarse/desconectarse fácilmente, elegir exit-nodes disponibles y co
 
 Si eliges la opción 2, mostrará una lista de exit-nodes disponibles en tu red.
 
-🔧 Requisitos
+## 🔧 Requisitos
 - Tailscale instalado y en funcionamiento
 - Linux (probado en Linux Mint y Ubuntu, debería funcionar en cualquier distro)
