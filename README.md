@@ -49,5 +49,8 @@ Permite conectarse/desconectarse fácilmente, elegir exit-nodes disponibles y co
 Si eliges la opción 2, mostrará una lista de exit-nodes disponibles en tu red.
 
 ## 🔧 Requisitos
-- Tailscale instalado y en funcionamiento
-- Linux (probado en Linux Mint y Ubuntu, debería funcionar en cualquier distro)
+- [Tailscale](https://tailscale.com/) instalado y en funcionamiento
+- Linux
+
+## Notas
+- Este script ha sido probado en Linux Mint y Ubuntu, pero debería funcionar en cualquier Linux donde se pueda instalar Tailscale.
