@@ -51,7 +51,18 @@ while true; do
                 elif [ -n "${map[$choice]}" ]; then
                     nodename=${map[$choice]}
                     echo ">> Conectando al exit-node: $nodename"
-                    sudo tailscale up --exit-node="$nodename"
+                    # Detectar flags no-default activos
+                    flags=""
+                    if tailscale status --json | grep -q '"AdvertiseRoutes":'; then
+                        advertise_routes=$(tailscale status --json | jq -r '.Self.AdvertiseRoutes | join(",")')
+                        [ "$advertise_routes" != "null" ] && flags+=" --advertise-routes=$advertise_routes"
+                    fi
+                    if tailscale status --json | grep -q '"AcceptRoutes":true'; then
+                        flags+=" --accept-routes"
+                    fi
+
+                    # Conectarse al exit-node respetando flags existentes
+                    sudo tailscale up --exit-node="$nodename" $flags
                 else
                     echo "Opción inválida."
                 fi
