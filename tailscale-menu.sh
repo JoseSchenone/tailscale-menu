@@ -9,10 +9,11 @@
 
 # --- Colores ---
 C_RESET='\033[0m'
-C_BLUE='\033[0;34m'
 C_GREEN='\033[0;32m'
 C_RED='\033[0;31m'
-C_YELLOW='\033[0;33m'
+C_YELLOW='\033[1;33m' # Amarillo brillante para acciones
+C_CYAN='\033[1;36m'   # Cian brillante para bordes y títulos
+C_BLUE='\033[1;34m'   # Azul brillante para números de opción
 
 # --- Funciones de Utilidad ---
 
@@ -55,7 +56,7 @@ connect_exit_node() {
         while read -r node; do
             name=$(echo "$node" | jq -r '.HostName')
             ip=$(echo "$node" | jq -r '.TailscaleIPs[0]')
-            echo -e "${C_GREEN}$i)${C_RESET} $name  (IP: $ip)"
+            echo -e "${C_BLUE}$i)${C_RESET} $name  (IP: $ip)"
             nodes_map[$i]=$name
             ((i++))
         done <<< "$nodes_json"
@@ -117,9 +118,9 @@ while true; do
     backend_state=$(echo "$status_output" | jq -r '.BackendState')
     exit_node_ip=$(echo "$status_output" | jq -r '.Self.ExitNodeIP // ""')
 
-    echo -e "${C_BLUE}=======================================${C_RESET}"
-    echo -e "${C_BLUE}          Control de Tailscale         ${C_RESET}"
-    echo -e "${C_BLUE}=======================================${C_RESET}"
+    echo -e "${C_CYAN}=======================================${C_RESET}"
+    echo -e "${C_CYAN}          Control de Tailscale         ${C_RESET}"
+    echo -e "${C_CYAN}=======================================${C_RESET}"
 
     if [ "$backend_state" = "Running" ]; then
         echo -e "Estado: ${C_GREEN}Conectado${C_RESET}"
@@ -130,7 +131,7 @@ while true; do
     else
         echo -e "Estado: ${C_RED}Desconectado${C_RESET}"
     fi
-    echo -e "${C_BLUE}---------------------------------------${C_RESET}"
+    echo -e "${C_CYAN}---------------------------------------${C_RESET}"
 
     echo "1) Conectar a Tailscale"
     echo "2) Conectar usando exit-node"
@@ -138,8 +139,8 @@ while true; do
     echo "4) Desconectar de Tailscale"
     echo "5) Ver estado detallado"
     echo "0) Salir"
-    echo -e "${C_BLUE}=======================================${C_RESET}"
-    read -rp "Elige una opción: " choice
+    echo -e "${C_CYAN}=======================================${C_RESET}"
+    read -rp "$(echo -e "${C_CYAN}Elige una opción:${C_RESET} ")" choice
 
     case $choice in
         1)
