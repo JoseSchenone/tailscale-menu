@@ -1,97 +1,169 @@
 #!/bin/bash
 # tailscale-menu.sh
 # Script interactivo para gestionar Tailscale en Linux
+#
 # Autor: José Schenone
 # Email: jose.schenone@gmail.com
 # Web: https://lu3ibm.blogspot.com/
 # Licencia: MIT
 
+# --- Colores ---
+C_RESET='\033[0m'
+C_BLUE='\033[0;34m'
+C_GREEN='\033[0;32m'
+C_RED='\033[0;31m'
+C_YELLOW='\033[0;33m'
+
+# --- Funciones de Utilidad ---
+
+# Pausa la ejecución hasta que el usuario presione Enter
+pause() {
+    read -rp "Presiona Enter para continuar..."
+}
+
+# Comprueba si los comandos necesarios están instalados
+check_deps() {
+    for cmd in tailscale jq; do
+        if ! command -v "$cmd" &> /dev/null; then
+            echo -e "${C_RED}Error: El comando '$cmd' no está instalado. Por favor, instálalo para continuar.${C_RESET}"
+            exit 1
+        fi
+    done
+}
+
+# --- Funciones del Menú ---
+
+connect_ts() {
+    echo -e ">> ${C_YELLOW}Conectando a Tailscale...${C_RESET}"
+    sudo tailscale up
+    pause
+}
+
+connect_exit_node() {
+    echo -e ">> ${C_YELLOW}Buscando nodos que ofrecen exit-node...${C_RESET}"
+    
+    # Usar jq para parsear el JSON de forma segura
+    nodes_json=$(tailscale status --json | jq -c '.Peer[] | select(.ExitNodeOption)')
+    
+    if [ -z "$nodes_json" ]; then
+        echo "No hay nodos disponibles como exit-node."
+    else
+        echo "Nodos disponibles:"
+        i=1
+        # Usamos un array indexado para mapear la opción al nombre del nodo
+        declare -a nodes_map
+        while read -r node; do
+            name=$(echo "$node" | jq -r '.HostName')
+            ip=$(echo "$node" | jq -r '.TailscaleIPs[0]')
+            echo -e "${C_GREEN}$i)${C_RESET} $name  (IP: $ip)"
+            nodes_map[$i]=$name
+            ((i++))
+        done <<< "$nodes_json"
+        echo "0) Cancelar"
+
+        read -rp "Selecciona un nodo: " choice
+        
+        if [[ "$choice" =~ ^[0-9]+$ ]] && [ "$choice" -ge 0 ] && [ "$choice" -lt "$i" ]; then
+            if [ "$choice" == "0" ]; then
+                echo "Cancelado, volviendo al menú principal..."
+            else
+                nodename=${nodes_map[$choice]}
+                echo -e ">> ${C_YELLOW}Conectando al exit-node: $nodename${C_RESET}"
+                
+                # Obtener flags actuales para mantenerlos
+                current_flags=$(tailscale status --json | jq -r '.Self | 
+                    (if .AcceptRoutes then "--accept-routes " else "" end) + 
+                    (if .AdvertiseRoutes | length > 0 then "--advertise-routes=" + (.AdvertiseRoutes | join(",")) else "" end)'
+                )
+
+                # Conectarse al exit-node respetando flags existentes
+                # shellcheck disable=SC2086
+                sudo tailscale up --exit-node="$nodename" $current_flags
+            fi
+        else
+            echo -e "${C_RED}Opción inválida.${C_RESET}"
+        fi
+    fi
+    pause
+}
+
+disconnect_exit_node() {
+    echo -e ">> ${C_YELLOW}Quitando exit-node, volviendo a modo normal...${C_RESET}"
+    sudo tailscale up --exit-node=
+    pause
+}
+
+disconnect_ts() {
+    echo -e ">> ${C_YELLOW}Desconectando de Tailscale...${C_RESET}"
+    sudo tailscale down
+    pause
+}
+
+show_status() {
+    echo -e ">> ${C_YELLOW}Estado actual de Tailscale:${C_RESET}"
+    tailscale status
+    pause
+}
+
+# --- Bucle Principal ---
+
+check_deps
+
 while true; do
     clear
-    echo "============================"
-    echo "   Control de Tailscale"
-    echo "============================"
+    
+    # Obtener estado actual para mostrar en el menú
+    status_output=$(tailscale status --json 2>/dev/null)
+    backend_state=$(echo "$status_output" | jq -r '.BackendState')
+    exit_node_ip=$(echo "$status_output" | jq -r '.Self.ExitNodeIP // ""')
+
+    echo -e "${C_BLUE}=======================================${C_RESET}"
+    echo -e "${C_BLUE}          Control de Tailscale         ${C_RESET}"
+    echo -e "${C_BLUE}=======================================${C_RESET}"
+
+    if [ "$backend_state" = "Running" ]; then
+        echo -e "Estado: ${C_GREEN}Conectado${C_RESET}"
+        if [ -n "$exit_node_ip" ]; then
+            exit_node_name=$(echo "$status_output" | jq -r --arg ip "$exit_node_ip" '.Peer[] | select(.TailscaleIPs[] == $ip) | .HostName')
+            echo -e "Usando Exit-Node: ${C_GREEN}${exit_node_name:-$exit_node_ip}${C_RESET}"
+        fi
+    else
+        echo -e "Estado: ${C_RED}Desconectado${C_RESET}"
+    fi
+    echo -e "${C_BLUE}---------------------------------------${C_RESET}"
+
     echo "1) Conectar a Tailscale"
     echo "2) Conectar usando exit-node"
-    echo "3) Desconectar de exit-node (volver a normal)"
+    echo "3) Desconectar de exit-node"
     echo "4) Desconectar de Tailscale"
-    echo "5) Ver estado"
+    echo "5) Ver estado detallado"
     echo "0) Salir"
-    echo "============================"
-    read -rp "Elige una opción: " opcion
+    echo -e "${C_BLUE}=======================================${C_RESET}"
+    read -rp "Elige una opción: " choice
 
-    case $opcion in
+    case $choice in
         1)
-            echo ">> Conectando a Tailscale..."
-            sudo tailscale up
-            read -rp "Presiona Enter para continuar..."
+            connect_ts
             ;;
         2)
-            echo ">> Buscando nodos que ofrecen exit-node..."
-            # Obtener nombre (columna 2) e IP (columna 1)
-            nodes=$(tailscale status | grep "exit node")
-            if [ -z "$nodes" ]; then
-                echo "No hay nodos disponibles como exit-node."
-            else
-                echo "Nodos disponibles:"
-                i=1
-                declare -A map
-                while read -r line; do
-                    name=$(echo "$line" | awk '{print $2}')
-                    ip=$(echo "$line" | awk '{print $1}')
-                    echo "$i) $name  (IP: $ip)"
-                    map[$i]=$name
-                    ((i++))
-                done <<< "$nodes"
-                echo "0) Cancelar"
-
-                read -rp "Selecciona un nodo: " choice
-                if [ "$choice" == "0" ]; then
-                    echo "Cancelado, volviendo al menú principal..."
-                elif [ -n "${map[$choice]}" ]; then
-                    nodename=${map[$choice]}
-                    echo ">> Conectando al exit-node: $nodename"
-                    # Detectar flags no-default activos
-                    flags=""
-                    if tailscale status --json | grep -q '"AdvertiseRoutes":'; then
-                        advertise_routes=$(tailscale status --json | jq -r '.Self.AdvertiseRoutes | join(",")')
-                        [ "$advertise_routes" != "null" ] && flags+=" --advertise-routes=$advertise_routes"
-                    fi
-                    if tailscale status --json | grep -q '"AcceptRoutes":true'; then
-                        flags+=" --accept-routes"
-                    fi
-
-                    # Conectarse al exit-node respetando flags existentes
-                    sudo tailscale up --exit-node="$nodename" $flags
-                else
-                    echo "Opción inválida."
-                fi
-            fi
-            read -rp "Presiona Enter para continuar..."
+            connect_exit_node
             ;;
         3)
-            echo ">> Quitando exit-node, volviendo a modo normal..."
-            sudo tailscale up --exit-node=
-            read -rp "Presiona Enter para continuar..."
+            disconnect_exit_node
             ;;
         4)
-            echo ">> Desconectando de Tailscale..."
-            sudo tailscale down
-            read -rp "Presiona Enter para continuar..."
+            disconnect_ts
             ;;
         5)
-            echo ">> Estado actual de Tailscale:"
-            tailscale status
-            read -rp "Presiona Enter para continuar..."
+            show_status
             ;;
         0)
-            echo "Saliendo..."
+            echo "¡Hasta luego!"
             exit 0
             ;;
         *)
-            echo "Opción inválida."
+            echo -e "${C_RED}Opción inválida.${C_RESET}"
             sleep 1
             ;;
     esac
 done
-
